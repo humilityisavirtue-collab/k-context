@@ -228,5 +228,121 @@ export function exportChain(format = 'md') {
     return md;
   }
 
+  if (format === 'redacted') {
+    return exportRedacted(chain, stats);
+  }
+
   return JSON.stringify(chain, null, 2);
+}
+
+/**
+ * Export redacted chain - hashes + summaries, declassified docs style
+ */
+function exportRedacted(chain, stats) {
+  const blocks = chain.blocks;
+
+  let out = `╔══════════════════════════════════════════════════════════════════╗
+║                    GOLDEN CHAIN — REDACTED LOG                   ║
+║                     Classification: UNCLASSIFIED                 ║
+╚══════════════════════════════════════════════════════════════════╝
+
+DOCUMENT ID: ${createHash('sha256').update(JSON.stringify(chain.metadata)).digest('hex').slice(0, 16)}
+GENERATED:   ${new Date().toISOString()}
+CHAIN START: ${stats.firstBlock || 'N/A'}
+CHAIN END:   ${stats.lastBlock || 'N/A'}
+TOTAL BLOCKS: ${stats.total}
+TOTAL TOKENS: ${stats.tokens}
+
+═══════════════════════════════════════════════════════════════════
+                          CHAIN INTEGRITY
+═══════════════════════════════════════════════════════════════════
+
+`;
+
+  // Verify and show integrity
+  const integrity = verifyChain();
+  out += `STATUS: ${integrity.valid ? '✓ VERIFIED' : '✗ INTEGRITY ERRORS'}\n`;
+  if (!integrity.valid) {
+    integrity.errors.forEach(e => { out += `  ERROR: ${e}\n`; });
+  }
+
+  out += `\n═══════════════════════════════════════════════════════════════════
+                         STATISTICAL SUMMARY
+═══════════════════════════════════════════════════════════════════
+
+BY TIER:
+`;
+  for (const [tier, count] of Object.entries(stats.byTier)) {
+    const pct = ((count / stats.total) * 100).toFixed(1);
+    const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5));
+    out += `  ${tier.padEnd(10)} ${bar} ${count} (${pct}%)\n`;
+  }
+
+  out += `\nBY SUIT:\n`;
+  for (const [suit, count] of Object.entries(stats.bySuit)) {
+    const pct = ((count / stats.total) * 100).toFixed(1);
+    const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5));
+    out += `  ${suit.padEnd(10)} ${bar} ${count} (${pct}%)\n`;
+  }
+
+  out += `\n═══════════════════════════════════════════════════════════════════
+                          BLOCK MANIFEST
+═══════════════════════════════════════════════════════════════════
+
+`;
+
+  for (const block of blocks) {
+    const queryPreview = summarizeContent(block.query);
+    const responsePreview = summarizeContent(block.response);
+
+    out += `┌─────────────────────────────────────────────────────────────────┐
+│ BLOCK ${String(block.id).padStart(4, '0')}                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│ TIMESTAMP: ${block.timestamp.padEnd(51)}│
+│ K-VECTOR:  ${(typeof block.kVector === 'object' ? block.kVector?.shorthand : block.kVector || '???').padEnd(51)}│
+│ SUIT:      ${String(block.suit || '???').padEnd(51)}│
+│ TIER:      ${String(block.tier || '???').padEnd(51)}│
+│ TOKENS:    ${String(block.tokens || 0).padEnd(51)}│
+├─────────────────────────────────────────────────────────────────┤
+│ HASH:      ${block.hash.padEnd(51)}│
+│ PREV:      ${block.prevHash.padEnd(51)}│
+├─────────────────────────────────────────────────────────────────┤
+│ QUERY:     ${queryPreview.padEnd(51)}│
+│ RESPONSE:  ${responsePreview.padEnd(51)}│
+└─────────────────────────────────────────────────────────────────┘
+
+`;
+  }
+
+  out += `═══════════════════════════════════════════════════════════════════
+                           END OF DOCUMENT
+                    This log is cryptographically
+                     verifiable via block hashes.
+═══════════════════════════════════════════════════════════════════
+`;
+
+  return out;
+}
+
+/**
+ * Summarize content for redacted view - show keywords, redact details
+ */
+function summarizeContent(text) {
+  if (!text) return '████████████████████████████████████';
+
+  const words = text.split(/\s+/).slice(0, 6);
+  let preview = words.join(' ');
+
+  if (preview.length > 40) {
+    preview = preview.slice(0, 37) + '...';
+  } else if (text.length > preview.length) {
+    preview += ' ██████████';
+  }
+
+  // Redact anything that looks like code or sensitive
+  preview = preview.replace(/[a-zA-Z0-9_]{20,}/g, '████████');
+  preview = preview.replace(/https?:\/\/\S+/g, '████████');
+  preview = preview.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/g, '████████');
+
+  return preview.slice(0, 51);
 }
