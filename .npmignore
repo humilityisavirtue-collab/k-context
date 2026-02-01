@@ -1,0 +1,13 @@
+# Don't publish the site or tests
+site/
+test/
+.cursor/
+
+# Don't publish lock files
+package-lock.json
+
+# Don't publish dev/build artifacts
+node_modules/
+.git/
+*.log
+.DS_Store
