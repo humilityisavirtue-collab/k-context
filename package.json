@@ -1,6 +1,6 @@
 {
   "name": "k-context",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate CLAUDE.md and Cursor rules from any codebase",
   "type": "module",
   "bin": {
