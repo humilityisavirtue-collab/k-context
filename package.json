@@ -1,7 +1,7 @@
 {
   "name": "k-context",
-  "version": "0.2.0",
-  "description": "Generate CLAUDE.md and Cursor rules from any codebase",
+  "version": "0.4.0",
+  "description": "AI context generation + distributed inference routing",
   "type": "module",
   "bin": {
     "k-context": "./bin/k-context.js"
@@ -22,7 +22,14 @@
     "context",
     "codebase",
     "documentation",
-    "developer-tools"
+    "developer-tools",
+    "inference",
+    "routing",
+    "distributed",
+    "llm",
+    "openai",
+    "gemini",
+    "ollama"
   ],
   "author": "",
   "license": "MIT",
