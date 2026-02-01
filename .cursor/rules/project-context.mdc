@@ -1,0 +1,30 @@
+---
+description: Project context for k-context
+globs: **/*
+alwaysApply: true
+---
+
+# k-context Context
+
+Generate CLAUDE.md and Cursor rules from any codebase
+
+## Tech Stack
+- javascript
+- json
+- markdown
+
+## File Patterns
+
+
+**Routes:** `src/**/*.js`
+
+
+
+
+## Key Conventions
+
+
+## Important Files
+
+- `src/index.js` — source
+- `package.json` — Configuration

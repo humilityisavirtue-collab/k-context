@@ -1,0 +1,46 @@
+{
+  "name": "k-context",
+  "version": "0.1.0",
+  "description": "Generate CLAUDE.md and Cursor rules from any codebase",
+  "type": "module",
+  "bin": {
+    "k-context": "./bin/k-context.js"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "ai",
+    "claude",
+    "cursor",
+    "context",
+    "codebase",
+    "documentation",
+    "developer-tools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/humilityisavirtue-collab/k-context"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "fast-glob": "^3.3.2",
+    "handlebars": "^4.7.8",
+    "ora": "^8.0.1",
+    "sade": "^1.8.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

@@ -1,0 +1,53 @@
+---
+description: Project context for {{packageJson.name}}
+globs: {{globs}}
+alwaysApply: true
+---
+
+# {{packageJson.name}} Context
+
+{{#if packageJson.description}}
+{{packageJson.description}}
+{{/if}}
+
+## Tech Stack
+{{#each frameworks}}
+- {{this}}
+{{/each}}
+{{#each languages}}
+- {{@key}}
+{{/each}}
+
+## File Patterns
+
+{{#if patterns.components}}
+**Components:** `{{patterns.components}}`
+{{/if}}
+
+{{#if patterns.routes}}
+**Routes:** `{{patterns.routes}}`
+{{/if}}
+
+{{#if patterns.api}}
+**API:** `{{patterns.api}}`
+{{/if}}
+
+{{#if patterns.tests}}
+**Tests:** `{{patterns.tests}}`
+{{/if}}
+
+{{#if patterns.styles}}
+**Styles:** `{{patterns.styles}}`
+{{/if}}
+
+## Key Conventions
+
+{{#each conventions}}
+- {{this}}
+{{/each}}
+
+## Important Files
+
+{{#each keyFiles}}
+- `{{path}}` — {{description}}
+{{/each}}
