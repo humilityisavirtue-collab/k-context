@@ -1,12 +1,27 @@
 import sade from 'sade';
 import chalk from 'chalk';
 import ora from 'ora';
+import { createInterface } from 'readline';
 import { scan } from './scanner.js';
 import { generate } from './generator.js';
-import { getLicense, getLimits, checkLimits, activateLicense } from './license.js';
+import { getLicense, getLimits, checkLimits, activateLicense, refreshLicense } from './license.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
+// Simple readline prompt
+function prompt(question) {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  return new Promise(resolve => {
+    rl.question(question, answer => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -164,16 +179,59 @@ export function createCLI() {
     });
 
   prog
-    .command('activate <email> <key>', 'Activate Pro license')
-    .action(async (email, key) => {
+    .command('activate [email]', 'Activate Pro license')
+    .action(async (emailArg) => {
+      const spinner = ora();
+
       try {
-        const license = activateLicense(email, key);
-        console.log(chalk.green('License activated!'));
+        // Get email if not provided
+        let email = emailArg;
+        if (!email) {
+          email = await prompt('Email: ');
+        }
+
+        if (!email) {
+          console.error(chalk.red('Email is required'));
+          process.exit(1);
+        }
+
+        // Prompt for license key
+        const licenseKey = await prompt('License key: ');
+
+        if (!licenseKey) {
+          console.error(chalk.red('License key is required'));
+          process.exit(1);
+        }
+
+        spinner.start('Verifying license...');
+        const license = await activateLicense(email, licenseKey);
+        spinner.succeed(chalk.green('License activated!'));
+
         console.log('Email:', license.email);
         console.log('Tier:', chalk.green('Pro'));
       } catch (err) {
-        console.error(chalk.red('Failed to activate license:'), err.message);
+        spinner.fail(chalk.red('Failed to activate license'));
+        console.error(chalk.red(err.message));
         process.exit(1);
+      }
+    });
+
+  prog
+    .command('refresh', 'Re-verify license with server')
+    .action(async () => {
+      const spinner = ora('Verifying license...').start();
+
+      try {
+        const success = await refreshLicense();
+
+        if (success) {
+          spinner.succeed(chalk.green('License verified'));
+        } else {
+          spinner.warn('Could not verify license');
+        }
+      } catch (err) {
+        spinner.fail(chalk.red('Verification failed'));
+        console.error(chalk.red(err.message));
       }
     });
 

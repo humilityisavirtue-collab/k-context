@@ -4,6 +4,7 @@ import { homedir } from 'os';
 
 const CONFIG_DIR = join(homedir(), '.k-context');
 const LICENSE_FILE = join(CONFIG_DIR, 'license.json');
+const VERIFY_URL = 'https://k-context.vercel.app/api/verify';
 
 // Free tier limits
 const FREE_LIMITS = {
@@ -30,7 +31,9 @@ export function getLicense() {
     return {
       tier: data.tier || 'free',
       email: data.email || null,
+      licenseKey: data.licenseKey || null,
       activatedAt: data.activatedAt || null,
+      verifiedAt: data.verifiedAt || null,
     };
   } catch {
     return { tier: 'free', email: null };
@@ -68,25 +71,90 @@ export function checkLimits(fileCount) {
 }
 
 /**
+ * Verify license key against server
+ */
+export async function verifyLicenseKey(licenseKey, email) {
+  try {
+    const response = await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, email })
+    });
+
+    if (!response.ok) {
+      return { valid: false, error: 'Server error' };
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    // Offline fallback: trust local license if recently verified
+    const license = getLicense();
+    if (license.tier === 'pro' && license.verifiedAt) {
+      const lastVerified = new Date(license.verifiedAt);
+      const daysSinceVerified = (Date.now() - lastVerified.getTime()) / (1000 * 60 * 60 * 24);
+
+      // Trust local license for up to 7 days offline
+      if (daysSinceVerified < 7) {
+        return { success: true, tier: 'pro', offline: true };
+      }
+    }
+
+    return { valid: false, error: 'Could not verify license (offline?)' };
+  }
+}
+
+/**
  * Activate a Pro license
  */
-export function activateLicense(email, licenseKey) {
-  // TODO: Verify license key against server
-  // For now, just store it locally
+export async function activateLicense(email, licenseKey) {
+  // Verify with server
+  const verification = await verifyLicenseKey(licenseKey, email);
 
+  if (!verification.success) {
+    throw new Error(verification.error || 'Invalid license key');
+  }
+
+  // Store locally
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
 
   const license = {
     tier: 'pro',
-    email,
+    email: verification.email || email,
     licenseKey,
     activatedAt: new Date().toISOString(),
+    verifiedAt: new Date().toISOString(),
   };
 
   writeFileSync(LICENSE_FILE, JSON.stringify(license, null, 2));
   return license;
+}
+
+/**
+ * Re-verify existing license (call periodically)
+ */
+export async function refreshLicense() {
+  const license = getLicense();
+
+  if (license.tier !== 'pro' || !license.licenseKey) {
+    return false;
+  }
+
+  const verification = await verifyLicenseKey(license.licenseKey, license.email);
+
+  if (verification.success) {
+    // Update verified timestamp
+    const updated = {
+      ...license,
+      verifiedAt: new Date().toISOString(),
+    };
+    writeFileSync(LICENSE_FILE, JSON.stringify(updated, null, 2));
+    return true;
+  }
+
+  return false;
 }
 
 /**

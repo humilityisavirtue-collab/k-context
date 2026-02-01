@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
+import { createLicense, cancelLicenseBySubscription } from '$lib/supabase';
+import { sendLicenseEmail } from '$lib/email';
 
 interface StripeEvent {
   id: string;
@@ -35,6 +37,13 @@ async function verifyStripeSignature(
 
     if (!timestamp || !v1Signature) return false;
 
+    // Check timestamp to prevent replay attacks (5 min tolerance)
+    const now = Math.floor(Date.now() / 1000);
+    if (Math.abs(now - parseInt(timestamp)) > 300) {
+      console.error('Webhook timestamp too old');
+      return false;
+    }
+
     const signedPayload = `${timestamp}.${payload}`;
     const expectedSignature = crypto
       .createHmac('sha256', secret)
@@ -45,13 +54,6 @@ async function verifyStripeSignature(
   } catch {
     return false;
   }
-}
-
-// TODO: Implement Supabase integration for license storage
-async function recordLicense(email: string, tier: string, stripeSessionId: string) {
-  console.log(`Recording license: ${email}, tier: ${tier}, session: ${stripeSessionId}`);
-  // Will implement Supabase storage later
-  return true;
 }
 
 export const prerender = false;
@@ -73,6 +75,7 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const event: StripeEvent = JSON.parse(payload);
+  console.log(`Stripe event: ${event.type}`);
 
   // Handle checkout completion
   if (event.type === 'checkout.session.completed') {
@@ -83,7 +86,22 @@ export const POST: RequestHandler = async ({ request }) => {
 
       if (email) {
         console.log(`Processing Pro purchase for ${email}`);
-        await recordLicense(email, 'pro', session.id);
+
+        // Create license in Supabase
+        const license = await createLicense(
+          email,
+          session.id,
+          session.subscription
+        );
+
+        if (license) {
+          console.log(`License created: ${license.license_key}`);
+
+          // Send license email
+          await sendLicenseEmail(email, license.license_key);
+        } else {
+          console.error('Failed to create license');
+        }
       }
     }
   }
@@ -92,7 +110,8 @@ export const POST: RequestHandler = async ({ request }) => {
   if (event.type === 'customer.subscription.deleted') {
     const subscription = event.data.object;
     console.log(`Subscription cancelled: ${subscription.id}`);
-    // TODO: Revoke license
+
+    await cancelLicenseBySubscription(subscription.id);
   }
 
   return json({ received: true });
